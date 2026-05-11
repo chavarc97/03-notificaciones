@@ -7,7 +7,6 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: notificaciones
-  ECR_REGISTRY: 298572504484.dkr.ecr.us-east-1.amazonaws.com
 
 jobs:
   build-and-push:
@@ -50,18 +49,21 @@ jobs:
         AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+        AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+        SNS_TOPIC_ARN: ${{ secrets.SNS_TOPIC_ARN }}
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ec2-user
         key: ${{ secrets.EC2_SSH_KEY }}
-        envs: AWS_KEY,AWS_SECRET,AWS_TOKEN
+        envs: AWS_KEY,AWS_SECRET,AWS_TOKEN,AWS_ACCOUNT_ID,SNS_TOPIC_ARN
         script: |
           export AWS_ACCESS_KEY_ID="$AWS_KEY"
           export AWS_SECRET_ACCESS_KEY="$AWS_SECRET"
           export AWS_SESSION_TOKEN="$AWS_TOKEN"
+          export ECR_REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com"
           aws ecr get-login-password --region us-east-1 | \
-            docker login --username AWS --password-stdin 298572504484.dkr.ecr.us-east-1.amazonaws.com
-          docker pull 298572504484.dkr.ecr.us-east-1.amazonaws.com/notificaciones:latest
+            docker login --username AWS --password-stdin $ECR_REGISTRY
+          docker pull $ECR_REGISTRY/notificaciones:latest
           docker network create examen-net 2>/dev/null || true
           docker stop notificaciones 2>/dev/null || true
           docker rm notificaciones 2>/dev/null || true
@@ -69,10 +71,10 @@ jobs:
             --name notificaciones \
             --network examen-net \
             -p 8002:8000 \
-            -e SNS_TOPIC_ARN=arn:aws:sns:us-east-1:298572504484:notas-venta-notifications \
+            -e SNS_TOPIC_ARN="$SNS_TOPIC_ARN" \
             -e AWS_REGION=us-east-1 \
             -e AWS_ACCESS_KEY_ID="$AWS_KEY" \
             -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET" \
             -e AWS_SESSION_TOKEN="$AWS_TOKEN" \
             --restart unless-stopped \
-            298572504484.dkr.ecr.us-east-1.amazonaws.com/notificaciones:latest
+            $ECR_REGISTRY/notificaciones:latest
